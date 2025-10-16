@@ -5,6 +5,9 @@ Requirements:
 Fedora:
 `sudo dnf install libXcursor-devel libXrandr-devel mesa-libGL-devel`
 
+To get clangd server work correctly with nvim, generate compile_commands.json when running cmake:
+`cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON .`
+
 ## Basics
 - vertex: single point in 3d
 - vertices: plural, multiple corner points like describing a triangle
