@@ -18,9 +18,16 @@ const char *fragmentShaderSource = "#version 330 core\n"
   "}";
 
 const float vertices[] = {
-  -0.5f, -0.5f, 0.0f,
-  0.5f, -0.5f, 0.0f,
-  0.0f, 0.5f, 0.0f
+  0.5f, 0.5f, 0.0f, // top right
+  0.5f, -0.5f, 0.0f, // bottom right
+  -0.5f, -0.5f, 0.0f, // bottom left
+  -0.5f, 0.5f, 0.0f // top left
+};
+
+// specify the order at which we want the vertices to be drawn
+unsigned int indices[] = {
+  0, 1, 3, // first triangle
+  1, 2, 3 // second triangle
 };
 
 void framebuffer_size_change_callback(GLFWwindow* window, int width, int height) {
@@ -58,19 +65,36 @@ int main() {
 
   glViewport(0, 0, 800, 600);
 
+  // vertex buffer object
+  unsigned int vbo;
+  glGenBuffers(1, &vbo);
+
+  // vertex array object -> remembers how attributes are read from our VBO
   unsigned int VAO;
   glGenVertexArrays(1, &VAO);
   
-  unsigned int VBO;
-  glGenBuffers(1, &VBO);
 
-  // 1. bind vertex array object
+  // element buffer object
+  unsigned int EBO;
+  glGenBuffers(1, &EBO);
+
+
+  // 1. bind vertex array object -> remembers our attributes
   glBindVertexArray(VAO);
-  // 2. copy vertices array (VBO) in a buffer for OpenGL to use
-  glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+  // 2. copy vertices array in a buffer for OpenGL to use
+  glBindBuffer(GL_ARRAY_BUFFER, vbo);
   glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-  // 3. set vertex attributes pointers
+
+  // 3. copy index array in a element buffer for OpenGL to use
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+  
+  // 4. set vertex attributes pointers
+  // this tells opengl how to actually interpret our vertex shader
+  // attribute(0) is of size 3, type float, we dont want it normalized, stride = offset between vertex attributes
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void*)0);
+  // also actually enable attribute(0)
   glEnableVertexAttribArray(0);
 
   unsigned int vertexShader;
@@ -113,15 +137,16 @@ int main() {
   glad_glDeleteShader(vertexShader);
   glad_glDeleteShader(fragmentShader);
 
+  glad_glUseProgram(shaderProgram);
+  glBindVertexArray(VAO);
+
   while(!glfwWindowShouldClose(window)) {
     processInput(window);
 
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glad_glUseProgram(shaderProgram);
-    glBindVertexArray(VAO);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
     glfwSwapBuffers(window);
     glfwPollEvents();
