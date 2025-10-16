@@ -17,6 +17,12 @@ const char *fragmentShaderSource = "#version 330 core\n"
   "FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);\n"
   "}";
 
+const float vertices[] = {
+  -0.5f, -0.5f, 0.0f,
+  0.5f, -0.5f, 0.0f,
+  0.0f, 0.5f, 0.0f
+};
+
 void framebuffer_size_change_callback(GLFWwindow* window, int width, int height) {
 	glViewport(0, 0, width, height);
 }
@@ -51,6 +57,21 @@ int main() {
   }
 
   glViewport(0, 0, 800, 600);
+
+  unsigned int VAO;
+  glGenVertexArrays(1, &VAO);
+  
+  unsigned int VBO;
+  glGenBuffers(1, &VBO);
+
+  // 1. bind vertex array object
+  glBindVertexArray(VAO);
+  // 2. copy vertices array (VBO) in a buffer for OpenGL to use
+  glBindBuffer(GL_ARRAY_BUFFER, VBO);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+  // 3. set vertex attributes pointers
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void*)0);
+  glEnableVertexAttribArray(0);
 
   unsigned int vertexShader;
   vertexShader = glCreateShader(GL_VERTEX_SHADER);
@@ -87,7 +108,6 @@ int main() {
   glad_glAttachShader(shaderProgram, fragmentShader);
   glad_glLinkProgram(shaderProgram);
 
-  glad_glUseProgram(shaderProgram);
 
   // we no longer need the shader objects as they are now linked in the program object
   glad_glDeleteShader(vertexShader);
@@ -98,6 +118,10 @@ int main() {
 
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
+
+    glad_glUseProgram(shaderProgram);
+    glBindVertexArray(VAO);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
 
     glfwSwapBuffers(window);
     glfwPollEvents();
