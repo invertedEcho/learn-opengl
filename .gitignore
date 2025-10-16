@@ -1,2 +1,13 @@
 .cache/
+
+# Cmake stuff
 CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+
+# make stuff
+Makefile
+
+# build
+LearnOpenGL
