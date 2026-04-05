@@ -1,4 +1,8 @@
 .cache/
+build/
+
+.direnv/
+.env*
 
 # Cmake stuff
 CMakeFiles/
