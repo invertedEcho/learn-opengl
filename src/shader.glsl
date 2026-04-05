@@ -1,6 +1,7 @@
 #version 330 core
 
-layout (location = 0) in vec3 aPos;
+// in means we have an input of type vec3, called 'aPos'
+layout(location = 0) in vec3 aPos;
 
 void main()
 {
