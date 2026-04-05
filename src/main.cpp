@@ -20,6 +20,10 @@ const char *fragmentShaderSource = "#version 330 core\n"
                                    "FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);\n"
                                    "}";
 
+// thanks to EBO (a buffer that stores indices to tell opengl in what order to
+// draw the vertices), for a rectangle we dont have to make two triangles (each
+// 3 vertices, e.g. 6 in total), but can just say the 4 vertices for the
+// rectaclge
 const float vertices[] = {
     0.5f,  0.5f,  0.0f, // top right
     0.5f,  -0.5f, 0.0f, // bottom right
@@ -28,7 +32,8 @@ const float vertices[] = {
 };
 
 // specify the order at which we want the vertices to be drawn
-unsigned int indices[] = {
+// so each number refers to the index in our vertices array
+unsigned int eboIndices[] = {
     0, 1, 3, // first triangle
     1, 2, 3  // second triangle
 };
@@ -80,8 +85,9 @@ int main() {
   glViewport(0, 0, 800, 600);
 
   // vertex buffer object
-  unsigned int vbo;
-  glGenBuffers(1, &vbo);
+  unsigned int VBO;
+  glGenBuffers(1, &VBO);
+  glBindBuffer(GL_ARRAY_BUFFER, VBO);
 
   // vertex array object -> remembers how attributes are read from our VBO
   unsigned int VAO;
@@ -95,18 +101,29 @@ int main() {
   glBindVertexArray(VAO);
 
   // 2. copy vertices array in a buffer for OpenGL to use
-  glBindBuffer(GL_ARRAY_BUFFER, vbo);
   glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
   // 3. copy index array in a element buffer for OpenGL to use
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(eboIndices), eboIndices,
                GL_STATIC_DRAW);
 
   // 4. set vertex attributes pointers
   // this tells opengl how to actually interpret our vertex shader
-  // attribute(0) is of size 3, type float, we dont want it normalized, stride =
-  // offset between vertex attributes
+  // parameters:
+  // 1. we want to configure the attribute 0, e.g. shader has location = 0
+  // 2. attribute(0) is of size 3, because vec3
+  // 3. the values are of type float
+  // 4. we dont want it normalized (in our case, its already normalized)
+  // 5. stride: tells us the space between consecutive vertex attributes.
+  //    in our case, the next set of position data is located exactly 3 times
+  //    the size of a float.
+  // 6. offset of where the position data begins in the buffer. since its at the
+  //    very beginning, this is 0. this has this void cast, for 0, we could also
+  //    leave it out, but this wouldnt work if its not 0, because the last
+  //    argument has to be of type void as pointer. it works with 0 because 0 is
+  //    a null pointer constant, and it can be implicility converted to any
+  //    pointer type.
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void *)0);
   // also actually enable attribute(0)
   glEnableVertexAttribArray(0);
@@ -114,6 +131,8 @@ int main() {
   unsigned int vertexShader;
   vertexShader = glCreateShader(GL_VERTEX_SHADER);
   glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
+
+  // the vertex shader gets dynamically compiled at run-time
   glCompileShader(vertexShader);
 
   int compileVertexShaderSuccess;
@@ -142,6 +161,10 @@ int main() {
               << infoLogFragmentShader << std::endl;
   }
 
+  // the shader program is the final linked version of multiple shaders
+  // combined, e.g. in our case the vertex shader together with the fragment
+  // shader.
+
   // TODO: check if shader program failed
   unsigned int shaderProgram;
   shaderProgram = glCreateProgram();
@@ -163,8 +186,18 @@ int main() {
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    // glPolygonMode: tells OpenGL how to draw its primitives
+    // wireframe mode:
+    // 1. GL_FRONT_AND_BACK: apply it to the front and back of all triangles
+    // (front and back of triangle in 3D space)
+    // 2. GL_LINE: draw them as lines
+    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
+    // 1. we want to draw triangles
+    // 2. 6 vertices
+    // 3. the type of our indices is int (How can it be something other than
+    //    int?)
+    // 4. last argument is offset for EBO
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
     glfwSwapBuffers(window);
