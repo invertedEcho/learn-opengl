@@ -1,47 +1,38 @@
 // clang-format off
 #include "glad/glad.h"
 #include "GLFW/glfw3.h"
+#include "shader.h"
 // clang-format on
 
+#include <cmath>
 #include <iostream>
-
-const char *vertexShaderSource =
-    "#version 330 core\n"
-    "layout (location = 0) in vec3 aPos;\n"
-    "out vec4 vertexColor;\n"
-    "void main()\n"
-    "{\n"
-    "gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
-    "vertexColor = vec4(0.5, 0.0, 0.0, 1.0);\n" // output variable dark red,
-                                                // gets interpreted by
-                                                // fragmentShader
-    "}";
-
-const char *fragmentShaderSource = "#version 330 core\n"
-                                   "out vec4 FragColor;\n"
-                                   "in vec4 vertexColor;\n"
-                                   "void main()\n"
-                                   "{\n"
-                                   "FragColor = vertexColor;\n"
-                                   "}";
 
 // thanks to EBO (a buffer that stores indices to tell opengl in what order to
 // draw the vertices), for a rectangle we dont have to make two triangles (each
 // 3 vertices, e.g. 6 in total), but can just say the 4 vertices for the
 // rectaclge
-const float vertices[] = {
-    0.5f,  0.5f,  0.0f, // top right
-    0.5f,  -0.5f, 0.0f, // bottom right
-    -0.5f, -0.5f, 0.0f, // bottom left
-    -0.5f, 0.5f,  0.0f  // top left
+const float rectangleVertices[] = {
+    // positions         // colors
+    0.5f,  0.5f,  0.0f, 0.0f, 1.0f, 0.0f, // top right
+    0.5f,  -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, // bottom right
+    -0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.0f, // bottom left
+    -0.5f, 0.5f,  0.0f, 1.0f, 0.0f, 0.0f  // top left
+};
+
+const float triangleVertces[] = {
+    0.0,   0.5f,  0.0f, 0.0f, 0.0f, 1.0f, // top
+    -0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, // left
+    0.5f,  -0.5f, 0.0f, 1.0f, 0.0f, 0.0f  // right
 };
 
 // specify the order at which we want the vertices to be drawn
-// so each number refers to the index in our vertices array
-unsigned int eboIndices[] = {
+// so each number refers to the index in our `vertices` array
+unsigned int rectangleEboIndices[] = {
     0, 1, 3, // first triangle
     1, 2, 3  // second triangle
 };
+
+unsigned int eboIndices[] = {0, 1, 2};
 
 void framebuffer_size_change_callback(GLFWwindow *window, int width,
                                       int height) {
@@ -71,9 +62,6 @@ int main() {
 
   if (window == NULL) {
     std::cout << "Failed to create GLFW window" << std::endl;
-    // GLenum code;
-    // code = glGetError();
-    // printf("%u", code);
     glfwTerminate();
     return -1;
   }
@@ -106,7 +94,8 @@ int main() {
   glBindVertexArray(VAO);
 
   // 2. copy vertices array in a buffer for OpenGL to use
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(triangleVertces), triangleVertces,
+               GL_STATIC_DRAW);
 
   // 3. copy index array in a element buffer for OpenGL to use
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
@@ -121,75 +110,45 @@ int main() {
   // 3. the values are of type float
   // 4. we dont want it normalized (in our case, its already normalized)
   // 5. stride: tells us the space between consecutive vertex attributes.
-  //    in our case, the next set of position data is located exactly 3 times
-  //    the size of a float.
   // 6. offset of where the position data begins in the buffer. since its at the
   //    very beginning, this is 0. this has this void cast, for 0, we could also
   //    leave it out, but this wouldnt work if its not 0, because the last
   //    argument has to be of type void as pointer. it works with 0 because 0 is
   //    a null pointer constant, and it can be implicility converted to any
   //    pointer type.
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void *)0);
+  // position attribute
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, (void *)0);
   // also actually enable attribute(0)
   glEnableVertexAttribArray(0);
 
-  unsigned int vertexShader;
-  vertexShader = glCreateShader(GL_VERTEX_SHADER);
-  glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
+  // color attrribute
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6,
+                        (void *)(sizeof(float) * 3));
+  glEnableVertexAttribArray(1);
 
-  // the vertex shader gets dynamically compiled at run-time
-  glCompileShader(vertexShader);
-
-  int compileVertexShaderSuccess;
-  char infoLog[512];
-  glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &compileVertexShaderSuccess);
-
-  if (!compileVertexShaderSuccess) {
-    glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-    std::cout << "ERROR: Vertex shader compilation failed!\n"
-              << infoLog << std::endl;
-  }
-
-  unsigned int fragmentShader;
-  fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-  glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-  glCompileShader(fragmentShader);
-
-  int compileFragmentShaderSuccess;
-  char infoLogFragmentShader[512];
-  glGetShaderiv(fragmentShader, GL_COMPILE_STATUS,
-                &compileFragmentShaderSuccess);
-
-  if (!compileFragmentShaderSuccess) {
-    glGetShaderInfoLog(fragmentShader, 512, NULL, infoLogFragmentShader);
-    std::cout << "ERROR: Fragment shader compilation failed!\n"
-              << infoLogFragmentShader << std::endl;
-  }
-
-  // the shader program is the final linked version of multiple shaders
-  // combined, e.g. in our case the vertex shader together with the fragment
-  // shader.
-
-  // TODO: check if shader program failed
-  unsigned int shaderProgram;
-  shaderProgram = glCreateProgram();
-  glad_glAttachShader(shaderProgram, vertexShader);
-  glad_glAttachShader(shaderProgram, fragmentShader);
-  glad_glLinkProgram(shaderProgram);
-
-  // we no longer need the shader objects as they are now linked in the program
-  // object
-  glad_glDeleteShader(vertexShader);
-  glad_glDeleteShader(fragmentShader);
-
-  glad_glUseProgram(shaderProgram);
-  glBindVertexArray(VAO);
+  Shader shaderProgram = Shader("assets/shaders/vertexShader.glsl",
+                                "assets/shaders/fragmentShader.glsl");
+  shaderProgram.use();
 
   while (!glfwWindowShouldClose(window)) {
     processInput(window);
 
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
+
+    float timeValue = glfwGetTime();
+    float greenValue = (sin(timeValue) / 2.0f) + 0.5f;
+
+    // "ourColor" is the uniform we declared in our fragment shader
+    int vertexColorLocation =
+        glad_glGetUniformLocation(shaderProgram.ID, "ourColor");
+
+    shaderProgram.use();
+
+    // we first have to use the shader program, because glUniform4f operates on
+    // the currently active program. remember, opengl is state machine, and thus
+    // there is only one currently active shader program
+    glUniform4f(vertexColorLocation, 0.0f, greenValue, 0.0f, 1.0f);
 
     // glPolygonMode: tells OpenGL how to draw its primitives
     // wireframe mode:
@@ -203,6 +162,7 @@ int main() {
     // 3. the type of our indices is int (How can it be something other than
     //    int?)
     // 4. last argument is offset for EBO
+    glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
     glfwSwapBuffers(window);
