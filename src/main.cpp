@@ -7,16 +7,19 @@
 #include <cmath>
 #include <iostream>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 // thanks to EBO (a buffer that stores indices to tell opengl in what order to
 // draw the vertices), for a rectangle we dont have to make two triangles (each
 // 3 vertices, e.g. 6 in total), but can just say the 4 vertices for the
 // rectaclge
 const float rectangleVertices[] = {
-    // positions         // colors
-    0.5f,  0.5f,  0.0f, 0.0f, 1.0f, 0.0f, // top right
-    0.5f,  -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, // bottom right
-    -0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.0f, // bottom left
-    -0.5f, 0.5f,  0.0f, 1.0f, 0.0f, 0.0f  // top left
+    // positions        // colors         // texture coords
+    0.5f,  0.5f,  0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, // top right
+    0.5f,  -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, // bottom right
+    -0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, // bottom left
+    -0.5f, 0.5f,  0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f  // top left
 };
 
 const float triangleVertces[] = {
@@ -77,7 +80,9 @@ int main() {
 
   glViewport(0, 0, 800, 600);
 
-  // vertex buffer object
+  // vertex buffer object -> this is the data that gets fed into vertex shader
+  // attributes, the actual data "insertion" happens in
+  // glBufferData(GL_ARRAY_BUFFER, ...)
   unsigned int VBO;
   glGenBuffers(1, &VBO);
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
@@ -94,13 +99,13 @@ int main() {
   glBindVertexArray(VAO);
 
   // 2. copy vertices array in a buffer for OpenGL to use
-  glBufferData(GL_ARRAY_BUFFER, sizeof(triangleVertces), triangleVertces,
+  glBufferData(GL_ARRAY_BUFFER, sizeof(rectangleVertices), rectangleVertices,
                GL_STATIC_DRAW);
 
   // 3. copy index array in a element buffer for OpenGL to use
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(eboIndices), eboIndices,
-               GL_STATIC_DRAW);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(rectangleEboIndices),
+               rectangleEboIndices, GL_STATIC_DRAW);
 
   // 4. set vertex attributes pointers
   // this tells opengl how to actually interpret our vertex shader
@@ -117,18 +122,56 @@ int main() {
   //    a null pointer constant, and it can be implicility converted to any
   //    pointer type.
   // position attribute
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, (void *)0);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 8, (void *)0);
   // also actually enable attribute(0)
   glEnableVertexAttribArray(0);
 
   // color attrribute
-  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6,
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 8,
                         (void *)(sizeof(float) * 3));
   glEnableVertexAttribArray(1);
 
-  Shader shaderProgram = Shader("assets/shaders/vertexShader.glsl",
-                                "assets/shaders/fragmentShader.glsl");
+  // texture coords attribute
+  glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 8,
+                        (void *)(sizeof(float) * 6));
+  glEnableVertexAttribArray(2);
+
+  Shader shaderProgram = Shader("../assets/shaders/vertexShader.glsl",
+                                "../assets/shaders/fragmentShader.glsl");
   shaderProgram.use();
+
+  // textures
+  int width, height, nrChannels;
+  unsigned char *data =
+      stbi_load("../assets/container.jpg", &width, &height, &nrChannels, 0);
+
+  unsigned int woodenTexture;
+  glGenTextures(1, &woodenTexture);
+
+  // bind it so any subsequent texture commands will use our wooden texture
+  // (just like with everything else in OpenGL)
+  glBindTexture(GL_TEXTURE_2D, woodenTexture);
+
+  glad_glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glad_glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  glad_glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glad_glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+  // 1: texture target, meaning it will generate a texutre on the currently
+  //    bound texture object, thats why we just called glBindTexture
+  // 2: mip map level, in this case base level which is 0
+  // 3: the format in which we want to store the texture, our image has only RGB
+  //    values
+  // 6: should always be 0, "border"?
+  // 7 and 8: format and datatype of our source image
+  // 9: our actual image data
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB,
+               GL_UNSIGNED_BYTE, data);
+
+  // generate a mipmap for currently bound texture
+  glGenerateMipmap(GL_TEXTURE_2D);
+
+  stbi_image_free(data);
 
   while (!glfwWindowShouldClose(window)) {
     processInput(window);
@@ -140,15 +183,22 @@ int main() {
     float greenValue = (sin(timeValue) / 2.0f) + 0.5f;
 
     // "ourColor" is the uniform we declared in our fragment shader
-    int vertexColorLocation =
-        glad_glGetUniformLocation(shaderProgram.ID, "ourColor");
+    // int vertexColorLocation =
+    //     glGetUniformLocation(shaderProgram.ID, "ourColor");
+    //
+    // int hOffsetUniformLoc = glGetUniformLocation(shaderProgram.ID,
+    // "hOffset");
 
     shaderProgram.use();
+
+    // glUniform1f(hOffsetUniformLoc, 0.2);
 
     // we first have to use the shader program, because glUniform4f operates on
     // the currently active program. remember, opengl is state machine, and thus
     // there is only one currently active shader program
-    glUniform4f(vertexColorLocation, 0.0f, greenValue, 0.0f, 1.0f);
+    // glUniform4f(vertexColorLocation, 0.0f, greenValue, 0.0f, 1.0f);
+
+    glBindTexture(GL_TEXTURE_2D, woodenTexture);
 
     // glPolygonMode: tells OpenGL how to draw its primitives
     // wireframe mode:
