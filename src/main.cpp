@@ -121,9 +121,9 @@ int main() {
   //    argument has to be of type void as pointer. it works with 0 because 0 is
   //    a null pointer constant, and it can be implicility converted to any
   //    pointer type.
+
   // position attribute
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 8, (void *)0);
-  // also actually enable attribute(0)
   glEnableVertexAttribArray(0);
 
   // color attrribute
@@ -141,37 +141,82 @@ int main() {
   shaderProgram.use();
 
   // textures
+  stbi_set_flip_vertically_on_load(true);
   int width, height, nrChannels;
-  unsigned char *data =
+  unsigned int texture1, texture2;
+
+  unsigned char *texture1Data =
       stbi_load("../assets/container.jpg", &width, &height, &nrChannels, 0);
 
-  unsigned int woodenTexture;
-  glGenTextures(1, &woodenTexture);
-
-  // bind it so any subsequent texture commands will use our wooden texture
-  // (just like with everything else in OpenGL)
-  glBindTexture(GL_TEXTURE_2D, woodenTexture);
+  glGenTextures(1, &texture1);
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, texture1);
 
   glad_glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
   glad_glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
   glad_glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glad_glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-  // 1: texture target, meaning it will generate a texutre on the currently
-  //    bound texture object, thats why we just called glBindTexture
-  // 2: mip map level, in this case base level which is 0
-  // 3: the format in which we want to store the texture, our image has only RGB
-  //    values
-  // 6: should always be 0, "border"?
-  // 7 and 8: format and datatype of our source image
-  // 9: our actual image data
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB,
-               GL_UNSIGNED_BYTE, data);
+  if (texture1Data) {
+    // 1: texture target, meaning it will generate a texutre on the currently
+    //    bound texture object, thats why we just called glBindTexture
+    // 2: mip map level, in this case base level which is 0
+    // 3: the format in which we want to store the texture, our image has only
+    // RGB
+    //    values
+    // 6: should always be 0, "border"?
+    // 7 and 8: format and datatype of our source image
+    // 9: our actual image data
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB,
+                 GL_UNSIGNED_BYTE, texture1Data);
 
-  // generate a mipmap for currently bound texture
-  glGenerateMipmap(GL_TEXTURE_2D);
+    // generate a mipmap for currently bound texture
+    glGenerateMipmap(GL_TEXTURE_2D);
+  } else {
+    std::cerr << "Failed to load container texture" << std::endl;
+  }
 
-  stbi_image_free(data);
+  stbi_image_free(texture1Data);
+
+  // awesome face texture
+  unsigned char *texture2Data =
+      stbi_load("../assets/awesomeface.png", &width, &height, &nrChannels, 0);
+
+  glGenTextures(1, &texture2);
+  glBindTexture(GL_TEXTURE_2D, texture2);
+
+  glad_glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glad_glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  glad_glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glad_glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+  if (texture2Data) {
+    // awesome face is png, which includes alpha channel, hence GL_RGBA
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA,
+                 GL_UNSIGNED_BYTE, texture2Data);
+
+    glGenerateMipmap(GL_TEXTURE_2D);
+  } else {
+    std::cerr << "Failed to load awesomeface texture" << std::endl;
+  }
+
+  stbi_image_free(texture2Data);
+
+  shaderProgram.use();
+
+  // "ourColor" is the uniform we declared in our fragment shader
+  // int vertexColorLocation =
+  //     glGetUniformLocation(shaderProgram.ID, "ourColor");
+  //
+  // int hOffsetUniformLoc = glGetUniformLocation(shaderProgram.ID,
+  // "hOffset");
+
+  // we first have to use the shader program, because glUniform4f operates on
+  // the currently active program. remember, opengl is state machine, and thus
+  // there is only one currently active shader program
+  // glUniform4f(vertexColorLocation, 0.0f, greenValue, 0.0f, 1.0f);
+  shaderProgram.setInt("texture1", 0);
+  shaderProgram.setInt("texture2", 1);
 
   while (!glfwWindowShouldClose(window)) {
     processInput(window);
@@ -179,26 +224,18 @@ int main() {
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    float timeValue = glfwGetTime();
-    float greenValue = (sin(timeValue) / 2.0f) + 0.5f;
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture1);
 
-    // "ourColor" is the uniform we declared in our fragment shader
-    // int vertexColorLocation =
-    //     glGetUniformLocation(shaderProgram.ID, "ourColor");
-    //
-    // int hOffsetUniformLoc = glGetUniformLocation(shaderProgram.ID,
-    // "hOffset");
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, texture2);
 
     shaderProgram.use();
 
+    // float timeValue = glfwGetTime();
+    // float greenValue = (sin(timeValue) / 2.0f) + 0.5f;
+
     // glUniform1f(hOffsetUniformLoc, 0.2);
-
-    // we first have to use the shader program, because glUniform4f operates on
-    // the currently active program. remember, opengl is state machine, and thus
-    // there is only one currently active shader program
-    // glUniform4f(vertexColorLocation, 0.0f, greenValue, 0.0f, 1.0f);
-
-    glBindTexture(GL_TEXTURE_2D, woodenTexture);
 
     // glPolygonMode: tells OpenGL how to draw its primitives
     // wireframe mode:
